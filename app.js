@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import fs from "fs";
 import * as readline from "readline";
+// map of status codes to their corresponding messages
 const statusCodes = {
     "200": "OK",
     "201": "Created",
@@ -58,6 +59,7 @@ const statusCodes = {
     "511": "Network Authentication Required",
     "- -": "Server did not respond"
 };
+// function to digest the log file
 function countEndpointHits(logFilePath) {
     const stream = fs.createReadStream(logFilePath);
     // create a readline interface to read the file line by line
@@ -68,30 +70,26 @@ function countEndpointHits(logFilePath) {
     let timeSeriesData = {};
     let endpointMapper = {};
     let statusCodeMapper = {};
-    let lineCount = 0;
     rl.on("line", (line) => {
         let flag = false;
         if (line.includes('GET') || line.includes('POST') || line.includes('PUT') || line.includes('PATCH') || line.includes('DELETE')) {
             flag = true;
         }
+        // if endpoint is hit, extract the endpoint and status code and time from the line
         if (flag) {
             let matches = line.match(/"([^"]+)"/g);
             if (matches && matches.length >= 2) {
                 const endpointText = matches[0];
                 let lineWithoutFirstQuotedText = line.substring(line.indexOf(endpointText) + endpointText.length + 1);
-                // get first three characters of lineWithoutFirstQuotedText
                 let statusCode = lineWithoutFirstQuotedText.substring(0, 3);
                 const firstQuotedText = endpointText.slice(1, -1);
-                // get the string between the first and second space of firstQuotedText
                 let endpoint = firstQuotedText.split(' ')[1];
                 endpointMapper[endpoint] = endpointMapper[endpoint] ? endpointMapper[endpoint] + 1 : 1;
                 statusCodeMapper[statusCode] = statusCodeMapper[statusCode] ? statusCodeMapper[statusCode] + 1 : 1;
-                // console.log('Endpoint:', endpoint);
             }
             else {
                 console.log('Not enough quoted text found in the log line.');
             }
-            // extract regular expression time in the format of "2023-07-06 15:14" from each line if it has it
             let time = line.match(/\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}/g);
             if (time != null) {
                 let timeString = time.toString();
@@ -100,8 +98,6 @@ function countEndpointHits(logFilePath) {
         }
     });
     rl.on('close', async () => {
-        // store timeseriesdata, endpointMapper, and statusCodeMapper in  endpointHits map
-        console.log("Done reading");
         const answer = await inquirer.prompt([
             {
                 type: "list",
@@ -121,12 +117,11 @@ function countEndpointHits(logFilePath) {
             console.table(endpointMapper);
         }
         else if (answer.name === "Status Code Mapper") {
-            // Convert the object into an array of objects
+            // Adding statusCode messages to the table
             const tableData = Object.entries(statusCodeMapper).map(([statusCode, count]) => ({
                 message: statusCodes[statusCode],
                 StatusCode: statusCode,
                 Count: count,
-                // Add any additional columns you want here
             }));
             console.table(tableData);
         }
@@ -148,7 +143,6 @@ async function askQuestion(logFiles) {
     console.log(`Hello ${answer.name}`);
     countEndpointHits(`./logs/${answer.name}`);
 }
-// create an array of strings
 const logFiles = [];
 fs.readdir("./logs", (err, files) => {
     if (err) {
